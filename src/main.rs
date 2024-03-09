@@ -7,6 +7,8 @@ use tonic::{Request, Response, Status};
 
 use market::market_server::{Market, MarketServer};
 
+use orcanet_market_ferrous::{get_current_time, EXPIRATION_OFFSET};
+
 pub mod market {
     tonic::include_proto!("market"); // The string specified here must match the proto package name
 }
@@ -16,6 +18,7 @@ struct FileRequest {
     // apparently the field is not required in proto3? need to unwrap option
     user: User,
     file_hash: String,
+    expiration: u64,
 }
 
 impl FileRequest {
@@ -24,6 +27,7 @@ impl FileRequest {
         Ok(Self {
             user: req.user.ok_or(())?,
             file_hash: req.file_hash,
+            expiration: get_current_time() + EXPIRATION_OFFSET,
         })
     }
 }
@@ -64,7 +68,7 @@ impl Market for MarketState {
 
         let mut market_data = self.market_data.lock().await;
 
-        (*market_data.files.entry(file_hash).or_default()).push(file_request);
+        (*market_data.files.entry(file_hash.clone()).or_default()).push(file_request);
 
         Ok(Response::new(()))
     }
@@ -75,15 +79,41 @@ impl Market for MarketState {
     ) -> Result<Response<HoldersResponse>, Status> {
         let CheckHoldersRequest { file_hash } = request.into_inner();
 
-        let market_data = self.market_data.lock().await;
-
+        let mut market_data = self.market_data.lock().await;
+        let now = get_current_time();
+        
         let mut users = vec![];
-        let holders = market_data.files.get(&file_hash);
 
-        if let Some(holders) = holders {
-            for holder in holders {
-                users.push(holder.user.clone());
+        let holders = market_data.files.get_mut(&file_hash);
+
+        if let Some(holders) = holders {   
+            // check if any of the files have expired
+            
+            let mut first_valid = -1;
+            //TODO: use binary search since times are inserted in order
+            for (i, holder) in holders.iter().enumerate() {
+                if holder.expiration > now {
+                    first_valid = i as i32;
+                    break;
+                }
             }
+            
+            // no valid files, remove all of them
+            if first_valid == -1 {
+                println!("All files ({}) expired.", holders.len());
+                market_data.files.remove(&file_hash);
+            } else {
+                if first_valid > 0 {
+                    println!("Found {} expired files", first_valid);
+                    // remove expired times
+                    holders.drain(0..first_valid as usize);
+                }
+                
+                for holder in holders {
+                    users.push(holder.user.clone());
+                }
+            }
+
         }
 
         market_data.print_holders_map();
