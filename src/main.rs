@@ -68,7 +68,7 @@ impl Market for MarketState {
 
         let mut market_data = self.market_data.lock().await;
 
-        (*market_data.files.entry(file_hash.clone()).or_default()).push(file_request);
+        (*market_data.files.entry(file_hash).or_default()).push(file_request);
 
         Ok(Response::new(()))
     }
