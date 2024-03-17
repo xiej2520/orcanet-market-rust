@@ -1,0 +1,16 @@
+[package]
+name = "orcanet-market-ferrous"
+version = "0.1.0"
+edition = "2021"
+default-run = "orcanet-market-ferrous"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lib-proto = { path = "../lib-proto" }
+libp2p = { version = "0.53.2", features = ["kad", "tokio", "tcp", "mdns", "noise", "yamux", "macros", "dns"] }
+prost = "0.12.3"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.114"
+tokio = { version = "1.36.0", features = ["full"] }
+tonic = "0.11.0"

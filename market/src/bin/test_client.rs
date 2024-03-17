@@ -1,12 +1,6 @@
-use market::HoldersResponse;
 use std::io::{stdin, stdout, Write};
 
-use crate::market::market_client::MarketClient;
-use crate::market::{CheckHoldersRequest, RegisterFileRequest, User};
-
-pub mod market {
-    tonic::include_proto!("market"); // Path to proto file
-}
+use lib_proto::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

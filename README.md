@@ -30,6 +30,18 @@ cargo run --bin test_client
 
 (currently the Go test client is interoperable)
 
+Note: currently requires two market servers running to have the Kademia network
+operable.
+
+```Shell
+cargo run
+# in another terminal, '-x' only launches kad network and not market server,
+# to avoid launching a server on conflicting ports
+cargo run -- -x
+# in another terminal
+cargo run --bin test_client
+```
+
 ## API
 Detailed gRPC endpoints are in `market/market.proto`
 
