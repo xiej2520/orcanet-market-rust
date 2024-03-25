@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use market::{CheckHoldersRequest, HoldersResponse, RegisterFileRequest, User};
@@ -51,30 +51,27 @@ impl MarketData {
             let user = &holder.user;
             // check if the user has expired
             if holder.expiration < current_time {
-              continue;
+                continue;
             } // this if statement must be first, otherwise it may unecessarily add expired holders or compare with expired holders
-            // if both duplicated holders are expired - we don't need either.
-            match previous_holders.entry(&user.id) {                  
-              Entry::Occupied(mut entry) => {    
-                  // check which holder has the most recent ttl
-                  // if the current holder has a more recent ttl, print it and remove the previous holder
-                  // if the previous holder has a more recent ttl, skip the current holder
-                  let prev_holder = entry.get();                    
-                  let current_holder_ttl = holder.expiration;       
-                  let previous_holder_ttl = prev_holder.expiration; 
-                  if current_holder_ttl > previous_holder_ttl {     
-                      entry.insert(holder);                         
-                  }                                                 
-              }                                                     
-              Entry::Vacant(entry) => {                             
-                  entry.insert(holder);                             
-              }                                                     
-          };                                                              
+              // if both duplicated holders are expired - we don't need either.
+            match previous_holders.entry(&user.id) { // check if the user id is already in the map
+                Entry::Occupied(mut entry) => {
+                    // check which holder has the most recent ttl
+                    // if the current holder has a more recent ttl, print it and remove the previous holder
+                    // if the previous holder has a more recent ttl, skip the current holder
+                    let prev_holder = entry.get();
+                    let current_holder_ttl = holder.expiration;
+                    let previous_holder_ttl = prev_holder.expiration;
+                    if current_holder_ttl > previous_holder_ttl {
+                        entry.insert(holder);
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(holder);
+                }
+            };
         }
-        return previous_holders
-            .into_iter()
-            .map(|(_, holder)| holder.clone())
-            .collect();
+        previous_holders.into_values().cloned().collect()
     }
 
     fn print_holders_map(&self) {
@@ -115,15 +112,12 @@ impl Market for MarketState {
         //     holders.retain(|holder| holder.user.id != file_request.user.id);
         // }
 
-
         (*market_data.files.entry(file_hash.clone()).or_default()).push(file_request);
 
         // get the validated holders - remove expired and duplicated holders
         let validated_holders = market_data.validate_holders(&file_hash);
 
-        market_data
-            .files
-            .insert(file_hash, validated_holders); // update the file holders to the validated holders
+        market_data.files.insert(file_hash, validated_holders); // update the file holders to the validated holders
 
         Ok(Response::new(()))
     }
