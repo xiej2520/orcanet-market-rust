@@ -69,18 +69,13 @@ impl MarketData {
     fn print_holders_map(&mut self) {
         let mut validated_files: HashMap<String, Vec<FileRequest>> = HashMap::new();
 
-        for (hash, _) in &self.files {
+        for (hash, holders) in &self.files {
             println!("File Hash: {hash}");
-            let validated_holders = self.validate_holders(&hash);
-            for holder in &validated_holders {
+            for holder in holders {
                 let user = &holder.user;
                 println!("Username: {}, Price: {}", user.name, user.price);
             }
-            validated_files.insert(hash.clone(), validated_holders);
         }
-
-        // set files to the validated files
-        self.files = validated_files;
     }
 }
 
@@ -104,7 +99,16 @@ impl Market for MarketState {
 
         let mut market_data = self.market_data.lock().await;
 
-        (*market_data.files.entry(file_hash).or_default()).push(file_request);
+        // validate file hash
+
+        (*market_data.files.entry(file_hash.clone()).or_default()).push(file_request);
+
+        // get the validated holders
+        let validated_holders = market_data.validate_holders(&file_hash);
+
+        market_data
+            .files
+            .insert(file_hash.clone(), validated_holders);
 
         Ok(Response::new(()))
     }
