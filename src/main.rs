@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use market::{CheckHoldersRequest, HoldersResponse, RegisterFileRequest, User};
@@ -40,8 +40,16 @@ impl MarketData {
     fn print_holders_map(&self) {
         for (hash, holders) in &self.files {
             println!("File Hash: {hash}");
+            // make a map of holders already printed
+            let mut holders_already_printed = HashSet::new();
             for holder in holders {
                 let user = &holder.user;
+                // check if multiple holders have the same id
+                if holders_already_printed.contains(&user.id) {
+                    // add more logic to remove duplicates
+                    continue;
+                }
+                holders_already_printed.insert(&user.id);
                 println!("Username: {}, Price: {}", user.name, user.price);
             }
         }
