@@ -106,8 +106,6 @@ impl Market for MarketState {
         // insert the file request into the market data and validate the holders
         market_data.insert_and_validate(&file_hash, &file_request);
 
-        // market_data.files.insert(file_hash, validated_holders); // update the file holders to the validated holders
-
         Ok(Response::new(()))
     }
 
