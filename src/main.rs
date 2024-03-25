@@ -1,4 +1,3 @@
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -38,40 +37,34 @@ struct MarketData {
 }
 
 impl MarketData {
-    fn validate_holders(&self, hash: &str) -> Vec<FileRequest> {
-        // make a map of holders already printed
-        let mut previous_holders: HashMap<&String, &FileRequest> = HashMap::new();
+    fn insert_and_validate(&mut self, hash: &str, filerequest: &FileRequest) {
+        // let mut holders: Vec<FileRequest> = vec![];
         // check if self.files[hash] exists
         if !self.files.contains_key(hash) {
-            return vec![];
+            self.files.insert(hash.to_string(), vec![filerequest.clone()]);
         }
-
-        for holder in &self.files[hash] {
-            let current_time = get_current_time();
+        let current_time = get_current_time();
+        let mut holder_indices = vec![];
+        for (pos, holder) in self.files[hash].iter().enumerate() {
             let user = &holder.user;
             // check if the user has expired
             if holder.expiration < current_time {
+                holder_indices.push(pos);
                 continue;
             } // this if statement must be first, otherwise it may unecessarily add expired holders or compare with expired holders
               // if both duplicated holders are expired - we don't need either.
-            match previous_holders.entry(&user.id) { // check if the user id is already in the map
-                Entry::Occupied(mut entry) => {
-                    // check which holder has the most recent ttl
-                    // if the current holder has a more recent ttl, print it and remove the previous holder
-                    // if the previous holder has a more recent ttl, skip the current holder
-                    let prev_holder = entry.get();
-                    let current_holder_ttl = holder.expiration;
-                    let previous_holder_ttl = prev_holder.expiration;
-                    if current_holder_ttl > previous_holder_ttl {
-                        entry.insert(holder);
-                    }
-                }
-                Entry::Vacant(entry) => {
-                    entry.insert(holder);
-                }
-            };
+
+            // check if the user is the same as the current holder
+            if user.id == filerequest.user.id {
+                holder_indices.push(pos);
+                continue;
+            }
         }
-        previous_holders.into_values().cloned().collect()
+        let producers =  self.files.get_mut(hash).unwrap(); // safe to unwrap since we already checked if the key exists
+        for i in holder_indices.iter().rev() {
+          producers.remove(*i);
+        }
+        producers.push(filerequest.clone());
     }
 
     fn print_holders_map(&self) {
@@ -105,12 +98,10 @@ impl Market for MarketState {
 
         let mut market_data = self.market_data.lock().await;
 
-        (*market_data.files.entry(file_hash.clone()).or_default()).push(file_request);
+        // insert the file request into the market data and validate the holders
+        market_data.insert_and_validate(&file_hash, &file_request);
 
-        // get the validated holders - remove expired and duplicated holders
-        let validated_holders = market_data.validate_holders(&file_hash);
-
-        market_data.files.insert(file_hash, validated_holders); // update the file holders to the validated holders
+        // market_data.files.insert(file_hash, validated_holders); // update the file holders to the validated holders
 
         Ok(Response::new(()))
     }
