@@ -44,6 +44,11 @@ impl MarketData {
 
         for holder in &self.files[hash] {
             let user = &holder.user;
+            // check if the user has expired
+            if holder.expiration < get_current_time() {
+              continue;
+            } // this if statement must be first, otherwise it may unecessarily add expired holders or compare with expired holders
+            // if both duplicated holders are expired - we don't need either.
             if previous_holders.contains_key(&user.id) {
                 // check which holder has the most recent ttl
                 // if the current holder has a more recent ttl, print it and remove the previous holder
@@ -67,8 +72,6 @@ impl MarketData {
     }
 
     fn print_holders_map(&mut self) {
-        let mut validated_files: HashMap<String, Vec<FileRequest>> = HashMap::new();
-
         for (hash, holders) in &self.files {
             println!("File Hash: {hash}");
             for holder in holders {
@@ -103,12 +106,12 @@ impl Market for MarketState {
 
         (*market_data.files.entry(file_hash.clone()).or_default()).push(file_request);
 
-        // get the validated holders
+        // get the validated holders - remove expired and duplicated holders
         let validated_holders = market_data.validate_holders(&file_hash);
 
         market_data
             .files
-            .insert(file_hash.clone(), validated_holders);
+            .insert(file_hash, validated_holders); // update the file holders to the validated holders
 
         Ok(Response::new(()))
     }
