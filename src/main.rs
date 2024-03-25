@@ -58,7 +58,6 @@ impl MarketData {
                           // do not increment index since we just swapped the current index with the last element
                 continue;
             } // this if statement must be first, otherwise it may unecessarily add expired holders or compare with expired holders
-              // if both duplicated holders are expired - we don't need either.
 
             // check if the user is the same as the current holder
             if user.id == filerequest.user.id {
