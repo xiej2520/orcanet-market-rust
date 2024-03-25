@@ -105,13 +105,6 @@ impl Market for MarketState {
 
         let mut market_data = self.market_data.lock().await;
 
-        // check if the file hash exists
-        // if market_data.files.contains_key(&file_hash) {
-        //     // if the file hash exists, iterate through the holders and remove user if user is the same
-        //     let holders = market_data.files.get_mut(&file_hash).unwrap();
-        //     holders.retain(|holder| holder.user.id != file_request.user.id);
-        // }
-
         (*market_data.files.entry(file_hash.clone()).or_default()).push(file_request);
 
         // get the validated holders - remove expired and duplicated holders
