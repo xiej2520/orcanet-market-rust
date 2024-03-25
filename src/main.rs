@@ -1,4 +1,5 @@
-use std::collections::{HashMap, HashSet};
+use core::{hash, time};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use market::{CheckHoldersRequest, HoldersResponse, RegisterFileRequest, User};
@@ -37,22 +38,50 @@ struct MarketData {
 }
 
 impl MarketData {
-    fn print_holders_map(&self) {
-        for (hash, holders) in &self.files {
-            println!("File Hash: {hash}");
-            // make a map of holders already printed
-            let mut holders_already_printed = HashSet::new();
-            for holder in holders {
-                let user = &holder.user;
-                // check if multiple holders have the same id
-                if holders_already_printed.contains(&user.id) {
-                    // add more logic to remove duplicates
-                    continue;
+    fn validate_holders(&self, hash: &String) -> Vec<FileRequest> {
+        // make a map of holders already printed
+        let mut previous_holders: HashMap<&String, &FileRequest> = HashMap::new();
+        let mut holders: Vec<FileRequest> = Vec::new();
+
+        for holder in &self.files[hash] {
+            let user = &holder.user;
+            if previous_holders.contains_key(&user.id) {
+                // check which holder has the most recent ttl
+                // if the current holder has a more recent ttl, print it and remove the previous holder
+                // if the previous holder has a more recent ttl, skip the current holder
+                let prev_holder = previous_holders.get(&user.id).unwrap();
+                let ttl_holder1 = holder.expiration - get_current_time();
+                let ttl_holder2 = &prev_holder.expiration - get_current_time();
+
+                if ttl_holder1 > ttl_holder2 {
+                    previous_holders.insert(&user.id, &holder);
                 }
-                holders_already_printed.insert(&user.id);
+                continue;
+            }
+            previous_holders.insert(&user.id, &holder);
+        }
+        // set holders to the remaining holders
+        for (_, holder) in previous_holders {
+            holders.push(holder.clone());
+        }
+        return holders;
+    }
+
+    fn print_holders_map(&mut self) {
+        let mut validated_files: HashMap<String, Vec<FileRequest>> = HashMap::new();
+
+        for (hash, _) in &self.files {
+            println!("File Hash: {hash}");
+            let validated_holders = self.validate_holders(&hash);
+            for holder in &validated_holders {
+                let user = &holder.user;
                 println!("Username: {}, Price: {}", user.name, user.price);
             }
+            validated_files.insert(hash.clone(), validated_holders);
         }
+
+        // set files to the validated files
+        self.files = validated_files;
     }
 }
 
@@ -89,14 +118,14 @@ impl Market for MarketState {
 
         let mut market_data = self.market_data.lock().await;
         let now = get_current_time();
-        
+
         let mut users = vec![];
 
         let holders = market_data.files.get_mut(&file_hash);
 
-        if let Some(holders) = holders {   
+        if let Some(holders) = holders {
             // check if any of the files have expired
-            
+
             let mut first_valid = -1;
             //TODO: use binary search since times are inserted in order
             for (i, holder) in holders.iter().enumerate() {
@@ -105,7 +134,7 @@ impl Market for MarketState {
                     break;
                 }
             }
-            
+
             // no valid files, remove all of them
             if first_valid == -1 {
                 println!("All files ({}) expired.", holders.len());
@@ -116,12 +145,11 @@ impl Market for MarketState {
                     // remove expired times
                     holders.drain(0..first_valid as usize);
                 }
-                
+
                 for holder in holders {
                     users.push(holder.user.clone());
                 }
             }
-
         }
 
         market_data.print_holders_map();
