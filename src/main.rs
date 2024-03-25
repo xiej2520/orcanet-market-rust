@@ -52,20 +52,13 @@ impl MarketData {
             let holder = producers.get(index).unwrap(); // safe to unwrap since index is always within bounds
             let user = &holder.user;
             // check if the user has expired
-            if holder.expiration < current_time {
+            if holder.expiration < current_time || user.id == filerequest.user.id {
                 producers.swap_remove(index);
                 len -= 1; // decrement length since we removed an element
                           // do not increment index since we just swapped the current index with the last element
                 continue;
             } // this if statement must be first, otherwise it may unecessarily add expired holders or compare with expired holders
 
-            // check if the user is the same as the current holder
-            if user.id == filerequest.user.id {
-                producers.swap_remove(index);
-                len -= 1; // decrement length since we removed an element
-                          // do not increment index since we just swapped the current index with the last element
-                continue;
-            }
             index += 1;
         }
         producers.push(filerequest.clone());
