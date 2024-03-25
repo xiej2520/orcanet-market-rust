@@ -41,7 +41,6 @@ impl MarketData {
     fn validate_holders(&self, hash: &String) -> Vec<FileRequest> {
         // make a map of holders already printed
         let mut previous_holders: HashMap<&String, &FileRequest> = HashMap::new();
-        let mut holders: Vec<FileRequest> = Vec::new();
 
         for holder in &self.files[hash] {
             let user = &holder.user;
@@ -50,21 +49,17 @@ impl MarketData {
                 // if the current holder has a more recent ttl, print it and remove the previous holder
                 // if the previous holder has a more recent ttl, skip the current holder
                 let prev_holder = previous_holders.get(&user.id).unwrap();
-                let ttl_holder1 = holder.expiration - get_current_time();
-                let ttl_holder2 = &prev_holder.expiration - get_current_time();
+                let current_holder_ttl = holder.expiration - get_current_time(); // current holder: smaller means older
+                let previous_holder_ttl: u64 = &prev_holder.expiration - get_current_time(); // previous holder: smaller means older
 
-                if ttl_holder1 > ttl_holder2 {
+                if current_holder_ttl > previous_holder_ttl { // if the current holder is younger, remove the previous holder
                     previous_holders.insert(&user.id, &holder);
                 }
                 continue;
             }
             previous_holders.insert(&user.id, &holder);
         }
-        // set holders to the remaining holders
-        for (_, holder) in previous_holders {
-            holders.push(holder.clone());
-        }
-        return holders;
+        return previous_holders.into_iter().map(|(_, holder)| holder.clone()).collect();
     }
 
     fn print_holders_map(&mut self) {
