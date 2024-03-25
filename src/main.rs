@@ -38,31 +38,36 @@ struct MarketData {
 
 impl MarketData {
     fn insert_and_validate(&mut self, hash: &str, filerequest: &FileRequest) {
-        // let mut holders: Vec<FileRequest> = vec![];
         // check if self.files[hash] exists
         if !self.files.contains_key(hash) {
-            self.files.insert(hash.to_string(), vec![filerequest.clone()]);
+            self.files
+                .insert(hash.to_string(), vec![filerequest.clone()]);
         }
         let current_time = get_current_time();
-        let mut holder_indices = vec![];
-        for (pos, holder) in self.files[hash].iter().enumerate() {
+        let producers = self.files.get_mut(hash).unwrap(); // safe to unwrap since we already checked if the key exists
+        let mut index = 0;
+        let mut len = producers.len();
+
+        while index < len {
+            let holder = producers.get(index).unwrap(); // safe to unwrap since index is always within bounds
             let user = &holder.user;
             // check if the user has expired
             if holder.expiration < current_time {
-                holder_indices.push(pos);
+                producers.swap_remove(index);
+                len -= 1; // decrement length since we removed an element
+                          // do not increment index since we just swapped the current index with the last element
                 continue;
             } // this if statement must be first, otherwise it may unecessarily add expired holders or compare with expired holders
               // if both duplicated holders are expired - we don't need either.
 
             // check if the user is the same as the current holder
             if user.id == filerequest.user.id {
-                holder_indices.push(pos);
+                producers.swap_remove(index);
+                len -= 1; // decrement length since we removed an element
+                          // do not increment index since we just swapped the current index with the last element
                 continue;
             }
-        }
-        let producers =  self.files.get_mut(hash).unwrap(); // safe to unwrap since we already checked if the key exists
-        for i in holder_indices.iter().rev() {
-          producers.remove(*i);
+            index += 1;
         }
         producers.push(filerequest.clone());
     }
