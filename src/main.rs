@@ -52,14 +52,18 @@ impl MarketData {
                 let current_holder_ttl = holder.expiration - get_current_time(); // current holder: smaller means older
                 let previous_holder_ttl: u64 = &prev_holder.expiration - get_current_time(); // previous holder: smaller means older
 
-                if current_holder_ttl > previous_holder_ttl { // if the current holder is younger, remove the previous holder
+                if current_holder_ttl > previous_holder_ttl {
+                    // if the current holder is younger, remove the previous holder
                     previous_holders.insert(&user.id, &holder);
                 }
                 continue;
             }
             previous_holders.insert(&user.id, &holder);
         }
-        return previous_holders.into_iter().map(|(_, holder)| holder.clone()).collect();
+        return previous_holders
+            .into_iter()
+            .map(|(_, holder)| holder.clone())
+            .collect();
     }
 
     fn print_holders_map(&mut self) {
