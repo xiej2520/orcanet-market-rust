@@ -37,10 +37,11 @@ struct MarketData {
 }
 
 impl MarketData {
-    fn insert_and_validate(&mut self, hash: String, filerequest: FileRequest) {
-        match self.files.get_mut(&hash) {
+    fn insert_and_validate(&mut self, filerequest: FileRequest) {
+        let hash = &filerequest.file_hash;
+        match self.files.get_mut(hash) {
             None => {
-                self.files.insert(hash, vec![filerequest]);
+                self.files.insert(hash.clone(), vec![filerequest]);
             }
             Some(producers) => {
                 let current_time = get_current_time();
@@ -77,13 +78,9 @@ impl Market for MarketState {
         let register_file_data = request.into_inner();
         let file_request = FileRequest::from(register_file_data)
             .map_err(|()| Status::invalid_argument("User not present"))?;
-        let file_hash = file_request.file_hash.clone();
-
         let mut market_data = self.market_data.lock().await;
-
         // insert the file request into the market data and validate the holders
-        market_data.insert_and_validate(file_hash, file_request);
-
+        market_data.insert_and_validate(file_request);
         Ok(Response::new(()))
     }
 
