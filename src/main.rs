@@ -41,7 +41,8 @@ impl MarketData {
         // check if self.files[hash] exists
         if !self.files.contains_key(&hash) {
             self.files
-                .insert(hash.to_string(), vec![filerequest]);
+                .insert(hash, vec![filerequest]);
+            return;
         }
         let current_time = get_current_time();
         let producers = self.files.get_mut(&hash).unwrap(); // safe to unwrap since we already checked if the key exists
