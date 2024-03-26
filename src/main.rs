@@ -37,14 +37,14 @@ struct MarketData {
 }
 
 impl MarketData {
-    fn insert_and_validate(&mut self, hash: &str, filerequest: &FileRequest) {
+    fn insert_and_validate(&mut self, hash: String, filerequest: FileRequest) {
         // check if self.files[hash] exists
-        if !self.files.contains_key(hash) {
+        if !self.files.contains_key(&hash) {
             self.files
-                .insert(hash.to_string(), vec![filerequest.clone()]);
+                .insert(hash.to_string(), vec![filerequest]);
         }
         let current_time = get_current_time();
-        let producers = self.files.get_mut(hash).unwrap(); // safe to unwrap since we already checked if the key exists
+        let producers = self.files.get_mut(&hash).unwrap(); // safe to unwrap since we already checked if the key exists
         let mut index = 0;
         let mut len = producers.len();
 
@@ -61,7 +61,7 @@ impl MarketData {
 
             index += 1;
         }
-        producers.push(filerequest.clone());
+        producers.push(filerequest);
     }
 
     fn print_holders_map(&self) {
@@ -96,7 +96,7 @@ impl Market for MarketState {
         let mut market_data = self.market_data.lock().await;
 
         // insert the file request into the market data and validate the holders
-        market_data.insert_and_validate(&file_hash, &file_request);
+        market_data.insert_and_validate(file_hash, file_request);
 
         Ok(Response::new(()))
     }
