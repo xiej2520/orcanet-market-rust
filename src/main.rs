@@ -38,15 +38,16 @@ struct MarketData {
 
 impl MarketData {
     fn insert_and_validate(&mut self, hash: String, filerequest: FileRequest) {
-        // check if self.files[hash] exists
-        if !self.files.contains_key(&hash) {
-            self.files.insert(hash, vec![filerequest]);
-            return;
+        match self.files.get_mut(&hash) {
+            None => {
+                self.files.insert(hash, vec![filerequest]);
+            }
+            Some(producers) => {
+                let current_time = get_current_time();
+                producers.retain(|holder| holder.expiration >= current_time && holder.user.id != filerequest.user.id);
+                producers.push(filerequest);
+            }
         }
-        let current_time = get_current_time();
-        let producers = self.files.get_mut(&hash).unwrap(); // safe to unwrap since we already checked if the key exists
-        producers.retain(|holder| holder.expiration >= current_time && holder.user.id != filerequest.user.id);
-        producers.push(filerequest);
     }
 
     fn print_holders_map(&self) {
