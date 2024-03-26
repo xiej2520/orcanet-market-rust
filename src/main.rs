@@ -40,28 +40,12 @@ impl MarketData {
     fn insert_and_validate(&mut self, hash: String, filerequest: FileRequest) {
         // check if self.files[hash] exists
         if !self.files.contains_key(&hash) {
-            self.files
-                .insert(hash, vec![filerequest]);
+            self.files.insert(hash, vec![filerequest]);
             return;
         }
         let current_time = get_current_time();
         let producers = self.files.get_mut(&hash).unwrap(); // safe to unwrap since we already checked if the key exists
-        let mut index = 0;
-        let mut len = producers.len();
-
-        while index < len {
-            let holder = producers.get(index).unwrap(); // safe to unwrap since index is always within bounds
-            let user = &holder.user;
-            // check if the user has expired
-            if holder.expiration < current_time || user.id == filerequest.user.id {
-                producers.swap_remove(index);
-                len -= 1; // decrement length since we removed an element
-                          // do not increment index since we just swapped the current index with the last element
-                continue;
-            } // this if statement must be first, otherwise it may unecessarily add expired holders or compare with expired holders
-
-            index += 1;
-        }
+        producers.retain(|holder| holder.expiration >= current_time && holder.user.id != filerequest.user.id);
         producers.push(filerequest);
     }
 
