@@ -45,7 +45,9 @@ impl MarketData {
             }
             Some(producers) => {
                 let current_time = get_current_time();
-                producers.retain(|holder| holder.expiration >= current_time && holder.user.id != filerequest.user.id);
+                producers.retain(|holder| {
+                    holder.expiration >= current_time && holder.user.id != filerequest.user.id
+                });
                 producers.push(filerequest);
             }
         }
