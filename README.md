@@ -16,7 +16,8 @@ An implementation of the OrcaNet market server, built using Rust and
 
 ## Running
 
-The market server requires a bootstrap Kademlia node to connect to.
+The market server requires a bootstrap Kademlia node to connect to. Skip this
+step if you want to connect to an existing network.
 
 To create a Kademlia network node, first create a public/private key pair
 
