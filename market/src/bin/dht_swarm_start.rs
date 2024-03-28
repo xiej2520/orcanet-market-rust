@@ -2,10 +2,11 @@
 use std::error::Error;
 use std::time::Duration;
 
+use clap::Parser;
 use libp2p::futures::StreamExt;
 use libp2p::identity::Keypair;
-use libp2p::kad;
 use libp2p::kad::store::MemoryStore;
+use libp2p::{kad, Multiaddr};
 use libp2p::{
     mdns, noise,
     swarm::{NetworkBehaviour, SwarmEvent},
@@ -25,9 +26,23 @@ struct Behaviour {
 ///
 /// rm private.pem      # optional
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Private key file, should be in rsa pkcs8 format
+    #[arg(short, long, default_value = "private.pk8")]
+    private_key: String,
+
+    /// Multiaddr for listen address
+    #[arg(short, long, default_value = "/ip4/0.0.0.0/tcp/6881")]
+    listen_address: Multiaddr,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let mut bytes = std::fs::read("private.pk8").expect("Failed to read ed25519 bytes");
+    let args = Args::parse();
+
+    let mut bytes = std::fs::read(args.private_key).expect("Failed to read private key bytes");
 
     let id_keys = Keypair::rsa_from_pkcs8(&mut bytes).expect("Failed to decode private key");
     let peer_id = id_keys.public().to_peer_id();
@@ -59,7 +74,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .behaviour_mut()
         .kademlia
         .set_mode(Some(kad::Mode::Server));
-    swarm.listen_on("/ip4/0.0.0.0/tcp/6881".parse()?)?;
+    swarm.listen_on(args.listen_address)?;
     println!("DHT swarm started");
 
     loop {
@@ -131,11 +146,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                 eprintln!("Successfully connected to {peer_id} at endpoint {endpoint:?}");
             },
-            SwarmEvent::ConnectionClosed { peer_id, .. } => 
-                eprintln!("Connected to {peer_id} closed"),
-            SwarmEvent::IncomingConnection { local_addr, send_back_addr, .. } => 
+            SwarmEvent::ConnectionClosed { peer_id, .. } => eprintln!("Connected to {peer_id} closed"),
+            SwarmEvent::IncomingConnection { local_addr, send_back_addr, .. } =>
                 eprintln!("Incoming connection local addr: {local_addr}, send_back_addr {send_back_addr}"),
-            SwarmEvent::IncomingConnectionError { local_addr, send_back_addr, error, .. } => 
+            SwarmEvent::IncomingConnectionError { local_addr, send_back_addr, error, .. } =>
                 eprintln!("Incoming connection error: {error}, local_addr: {local_addr}, send_back_addr: {send_back_addr}"),
             _ => eprintln!("{event:?}"),
         };

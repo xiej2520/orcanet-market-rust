@@ -30,6 +30,7 @@ struct Behaviour {
 /// Think about concurrency issues with multiple users accessing and modifying
 /// the map at the same time later
 
+// runs a kad node
 async fn kad_node(mut swarm: Swarm<Behaviour>, mut rx_kad: mpsc::Receiver<Command>) {
     let mut pending_get: HashMap<String, Vec<_>> = HashMap::new();
     let mut pending_put: HashMap<String, Vec<_>> = HashMap::new();
@@ -70,7 +71,7 @@ async fn kad_node(mut swarm: Swarm<Behaviour>, mut rx_kad: mpsc::Receiver<Comman
                             e.insert(resp);
                         }
                         Err(_) => {
-                            let _ = resp.send(Err(peer_id));
+                            let _ = resp.send(Err(peer_id)).await;
                         }
                     }
                 } else {
@@ -185,7 +186,7 @@ async fn kad_node(mut swarm: Swarm<Behaviour>, mut rx_kad: mpsc::Receiver<Comman
                 eprintln!("Failed to connected to {peer_id:?} with error {error}");
                 if let Some(peer_id) = peer_id {
                     if let Some(sender) = pending_dial.remove(&peer_id) {
-                        let _ = sender.send(Err(peer_id));
+                        let _ = sender.send(Err(peer_id)).await;
                     }
                 }
             },
@@ -219,7 +220,7 @@ pub enum Command {
         peer_id: PeerId,
         peer_addr: Multiaddr,
         resp: mpsc::Sender<Result<PeerId, PeerId>>,
-    }
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -227,7 +228,9 @@ pub struct DhtClient {
     tx_kad: mpsc::Sender<Command>,
 }
 impl DhtClient {
-    pub async fn spawn_client() -> Result<(Self, JoinHandle<()>), Box<dyn Error>> {
+    pub async fn spawn_client(
+        bootstrap_peers: &[Multiaddr],
+    ) -> Result<(Self, JoinHandle<()>), Box<dyn Error>> {
         //let mut swarm = libp2p::SwarmBuilder::with_existing_identity(id_keys)
         let mut swarm = libp2p::SwarmBuilder::with_new_identity()
             .with_tokio()
@@ -253,15 +256,13 @@ impl DhtClient {
             .build();
 
         // change to client for client node (less intensive)
-        swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Server));
-
-        let bootstrap_peers: Vec<Multiaddr> = vec![
-            "/ip4/172.20.233.20/tcp/6881/p2p/QmbLpFuqficFLGNcQSCU8udEZLSTVSjpMBxVidWnLyEwXv"
-                .parse()?,
-        ];
+        swarm
+            .behaviour_mut()
+            .kademlia
+            .set_mode(Some(kad::Mode::Server));
 
         let (tx_kad, rx_kad) = mpsc::channel(256);
-        
+
         let num_bootstrap = bootstrap_peers.len();
         let (tx_dial, mut rx_dial) = mpsc::channel(num_bootstrap);
 
@@ -276,22 +277,24 @@ impl DhtClient {
                 .add_address(&peer_id, peer_addr.clone());
 
             // try dialing all peers in bootstrap
-            let _ = tx_kad.send(Command::Dial { peer_id, peer_addr, resp: tx_dial.clone() }).await;
+            let _ = tx_kad
+                .send(Command::Dial {
+                    peer_id,
+                    peer_addr: peer_addr.clone(),
+                    resp: tx_dial.clone(),
+                })
+                .await;
         }
-        
+
         let handle = tokio::spawn(kad_node(swarm, rx_kad));
-        
+
         // wait for dial results
         let time_limit = sleep(Duration::from_secs(1));
         tokio::pin!(time_limit);
         let mut connected_to_some = false;
         for _ in 0..num_bootstrap {
             select! {
-                _ = &mut time_limit => {
-                    if !connected_to_some {
-                        return Err("Dialing bootstrap peers failed".into())
-                    }
-                }
+                _ = &mut time_limit => break,
                 recv_msg = rx_dial.recv() => match recv_msg {
                     Some(Ok(peer_id)) => {
                         eprintln!("Successfully dialed bootstrap peer {peer_id}");
@@ -303,6 +306,9 @@ impl DhtClient {
                     None => return Err("Failed to receive dial result message".into()),
                 }
             }
+        }
+        if !connected_to_some {
+            return Err("Dialing bootstrap peers failed".into());
         }
 
         // automatically called now
