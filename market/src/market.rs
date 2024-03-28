@@ -1,8 +1,8 @@
 use lib_proto::*;
 
 use crate::dht::DhtClient;
-use crate::FileRequest;
 use crate::get_current_time;
+use crate::FileRequest;
 
 use std::error::Error;
 
@@ -15,9 +15,7 @@ struct MarketData {
 
 impl MarketData {
     fn new(kad_wrapper: DhtClient) -> Self {
-        Self {
-            kad_wrapper,
-        }
+        Self { kad_wrapper }
     }
     async fn insert_and_validate(&self, file_request: FileRequest) {
         let hash = file_request.file_hash.clone();
@@ -32,7 +30,7 @@ impl MarketData {
         });
         files.push(file_request);
         match self.kad_wrapper.set_requests(&hash, files).await {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(_) => eprintln!("Failed to update file requests in Kad"),
         }
     }

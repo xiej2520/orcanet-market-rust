@@ -7,6 +7,6 @@ async fn main() -> Result<(), tokio::task::JoinError> {
         Ok(o) => o,
         Err(err) => panic!("Failed to spawn DHT client: {err}"),
     };
-    
+
     dht_handle.await
 }

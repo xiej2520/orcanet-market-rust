@@ -7,14 +7,14 @@ use orcanet_market_ferrous::market::Server;
 async fn main() -> Result<(), Box<dyn Error>> {
     //let argv: Vec<String> = std::env::args().collect();
 
-    let (dht_client, dht_handle) = match DhtClient::spawn_client() {
+    let (dht_client, dht_handle) = match DhtClient::spawn_client().await {
         Ok(o) => o,
         Err(err) => return Err(err),
     };
 
     let server_handle = tokio::spawn(async move {
-            let mut m = Server::new(dht_client);
-            m.server().await
+        let mut m = Server::new(dht_client);
+        m.server().await
     });
 
     let (server_res, kad_res) = (server_handle.await, dht_handle.await);
