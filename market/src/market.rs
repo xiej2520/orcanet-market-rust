@@ -18,6 +18,23 @@ impl MarketData {
             kad_wrapper,
         }
     }
+    async fn insert_and_validate(&self, file_request: FileRequest) {
+        let hash = file_request.file_hash.clone();
+        let Ok(files) = self.kad_wrapper.get_requests(&hash).await else {
+            eprintln!("Failed to fetch file requests from Kad");
+            return;
+        };
+        let mut files = files.unwrap_or(vec![]);
+        let current_time = get_current_time();
+        files.retain(|holder| {
+            holder.expiration >= current_time && holder.user.id != file_request.user.id
+        });
+        files.push(file_request);
+        match self.kad_wrapper.set_requests(&hash, files).await {
+            Ok(_) => {},
+            Err(_) => eprintln!("Failed to update file requests in Kad"),
+        }
+    }
     //fn print_holders_map(&self) {
     //    for (hash, holders) in &self.files {
     //        println!("File Hash: {hash}");
@@ -44,23 +61,9 @@ impl Market for MarketState {
         let register_file_data = request.into_inner();
         let file_request = FileRequest::try_from(register_file_data)
             .map_err(|()| Status::invalid_argument("User not present"))?;
-        let file_hash = file_request.file_hash.clone();
-
-        // fetch requests from kad
-        let requests = self
-            .market_data
-            .kad_wrapper
-            .get_requests(&file_hash)
-            .await?;
-
-        let mut requests = requests.unwrap_or(vec![]);
-        requests.push(file_request);
-
-        self.market_data
-            .kad_wrapper
-            .set_requests(&file_hash, requests)
-            .await
-            .map(|_ok| Response::new(()))
+        // insert the file request into the market data and validate the holders
+        self.market_data.insert_and_validate(file_request).await;
+        Ok(Response::new(()))
     }
 
     async fn check_holders(
