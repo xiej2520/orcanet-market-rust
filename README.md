@@ -16,13 +16,30 @@ An implementation of the OrcaNet market server, built using Rust and
 
 ## Running
 
-To run the market server:
+The market server requires a bootstrap Kademlia node to connect to.
+
+To create a Kademlia network node, first create a public/private key pair
 
 ```Shell
-cargo run
+openssl genrsa -out private.pem 2048
+openssl pkcs8 -in private.pem -inform PEM -topk8 -out private.pk8 -outform DER -nocrypt
+
+rm private.pem      # optional
 ```
 
-To run a test client:
+Then start the swarm node
+
+```Shell
+cargo run --bin dht_swarm_start -- --private-key private.pk8 --listen-address /ip4/0.0.0.0/tcp/6881
+```
+
+Now we can start a market server
+
+```Shell
+cargo run -- --bootstrap-peers /ip4/{ip_addr}/tcp/{port}/p2p/{public key}
+```
+
+To run a test client
 
 ```Shell
 cargo run --bin test_client
@@ -30,16 +47,10 @@ cargo run --bin test_client
 
 (currently the Go test client is interoperable)
 
-Note: currently requires two market servers running to have the Kademia network
-operable.
+To run more Kademlia nodes for testing
 
 ```Shell
-cargo run
-# in another terminal, '-x' only launches kad network and not market server,
-# to avoid launching a server on conflicting ports
-cargo run -- -x
-# in another terminal
-cargo run --bin test_client
+cargo run --bin dht_client -- --bootstrap-peers /ip4/{ip_addr}/tcp/{port}/p2p/{public key}
 ```
 
 ## API
