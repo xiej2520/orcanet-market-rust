@@ -1,4 +1,4 @@
-use orcanet_market_ferrous::*;
+use crate::*;
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -179,11 +179,11 @@ pub enum Command {
 }
 
 #[derive(Debug, Clone)]
-pub struct KadWrapper {
+pub struct DhtClient {
     tx_kad: mpsc::Sender<Command>,
 }
-impl KadWrapper {
-    pub fn spawn_kad() -> Result<(Self, JoinHandle<()>), Box<dyn Error>> {
+impl DhtClient {
+    pub fn spawn_client() -> Result<(Self, JoinHandle<()>), Box<dyn Error>> {
         let mut swarm = libp2p::SwarmBuilder::with_new_identity()
             .with_tokio()
             .with_tcp(

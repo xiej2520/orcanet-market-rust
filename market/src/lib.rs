@@ -1,7 +1,8 @@
+pub mod dht;
+pub mod market;
+
 use lib_proto::*;
-
 use std::time::{SystemTime, UNIX_EPOCH};
-
 use serde::{Deserialize, Serialize};
 
 // time in secs that a file is valid for

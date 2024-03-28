@@ -1,7 +1,8 @@
-use crate::kad_wrapper::KadWrapper;
 use lib_proto::*;
-use orcanet_market_ferrous::FileRequest;
-use orcanet_market_ferrous::get_current_time;
+
+use crate::dht::DhtClient;
+use crate::FileRequest;
+use crate::get_current_time;
 
 use std::error::Error;
 
@@ -9,11 +10,11 @@ use tonic::{Request, Response, Status};
 
 #[derive(Clone, Debug)]
 struct MarketData {
-    kad_wrapper: KadWrapper,
+    kad_wrapper: DhtClient,
 }
 
 impl MarketData {
-    fn new(kad_wrapper: KadWrapper) -> Self {
+    fn new(kad_wrapper: DhtClient) -> Self {
         Self {
             kad_wrapper,
         }
@@ -132,8 +133,8 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(kad_wrapper: KadWrapper) -> Self {
-        let market_data = MarketData::new(kad_wrapper);
+    pub fn new(dht_client: DhtClient) -> Self {
+        let market_data = MarketData::new(dht_client);
 
         Self { market_data }
     }
