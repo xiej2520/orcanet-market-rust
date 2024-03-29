@@ -5,7 +5,7 @@
 An implementation of the OrcaNet market server, built using Rust and
 [gRPC with Tonic](https://github.com/hyperium/tonic).
 
-## Setup
+## Requirements
 
 1. Install [Rust](https://www.rust-lang.org/tools/install)
 2. Install protoc:
@@ -14,12 +14,50 @@ An implementation of the OrcaNet market server, built using Rust and
 
    (May require more a [more recent version](https://grpc.io/docs/protoc-installation/#install-pre-compiled-binaries-any-os))
 
+The `setup.sh` script provided should install dependencies and build the project
+(tested on Ubuntu 20.04).
+
 ## Running
 
-The market server requires a bootstrap Kademlia node to connect to. Skip this
-step if you want to connect to an existing network.
+The default application built by this project will run both the market server
+with gRPC port 50051, and a Kademlia node. The `dht_client` binary will only
+run the Kademlia node. Parameters need to be provided to get the server to work
+with the Kademlia network.
 
-To create a Kademlia network node, first create a public/private key pair
+### Parameters
+
+The market server and the `dht_client` binary share the same parameters, which
+are used to configure the Kademlia node running on the application.
+
+* `bootstrap-peers` (Optional)
+  * Space separated list of Multiaddr peer nodes to connect to in order to
+  bootstrap the node onto a Kademlia network.
+  * If this is not provided, the application will start a new Kademlia network
+* `private-key`
+  * Private key in order for the node to be set up as a Kademlia server node.
+  * The application will print out the peer id derived from this key.
+  * This must be provided in order for the node to act as a server node, otherwise
+  it will only act as a client node (it can only query the network, and not
+  provide data).
+* `listen-address`
+  * Multiaddr that the application will listen on to act as a Kademlia server node.
+  * By default, *if `private-key` is provided*, the node will listen on
+  `/ip4/0.0.0.0/tcp/6881`
+
+
+### Connect to existing network
+
+To connect to an existing Kademlia network, provide the `bootstrap-peers` parameter
+with a space separated list of Multiaddrs. `private-key` and `listen-address`
+can optionally be provided to have the node also serve data to the network.
+
+```Shell
+cargo run -- --bootstrap-peers /ip4/{ip_addr}/tcp/{port}/p2p/{public key} ...
+```
+
+### Start a new Kademlia network
+
+To start a new Kademlia network, first create a public/private key pair
 
 ```Shell
 openssl genrsa -out private.pem 2048
@@ -28,31 +66,21 @@ openssl pkcs8 -in private.pem -inform PEM -topk8 -out private.pk8 -outform DER -
 rm private.pem      # optional
 ```
 
-Then start the swarm node
+Then run either the market server or `dht_client` with both the `private-key`
+and `listen-address` parameters provided.
 
 ```Shell
-cargo run --bin dht_swarm_start -- --private-key private.pk8 --listen-address /ip4/0.0.0.0/tcp/6881
+cargo run -- --private-key private.pk8 --listen-address /ip4/0.0.0.0/tcp/6881
+cargo run --bin dht_client -- --private-key private.pk8 # by default, /ip4/0.0.0.0/tcp/6881
 ```
 
-Now we can start a market server
-
-```Shell
-cargo run -- --bootstrap-peers /ip4/{ip_addr}/tcp/{port}/p2p/{public key}
-```
-
-To run a test client
+### Run test client
 
 ```Shell
 cargo run --bin test_client
 ```
 
 (currently the Go test client is interoperable)
-
-To run more Kademlia nodes for testing
-
-```Shell
-cargo run --bin dht_client -- --bootstrap-peers /ip4/{ip_addr}/tcp/{port}/p2p/{public key}
-```
 
 ## API
 Detailed gRPC endpoints are in `market/market.proto`

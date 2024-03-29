@@ -5,6 +5,7 @@ use std::error::Error;
 use std::time::Duration;
 
 use libp2p::futures::StreamExt;
+use libp2p::identity::Keypair;
 use libp2p::kad::store::MemoryStore;
 use libp2p::kad::{self, GetRecordError};
 use libp2p::multiaddr::Protocol;
@@ -228,43 +229,67 @@ pub struct DhtClient {
     tx_kad: mpsc::Sender<Command>,
 }
 impl DhtClient {
+    // spawns a DHT client
+    //
+    // Returns a DhtClient interface and a JoinHandle for the Dht task
     pub async fn spawn_client(
         bootstrap_peers: &[Multiaddr],
+        listen_on: Option<(Multiaddr, Keypair)>,
     ) -> Result<(Self, JoinHandle<()>), Box<dyn Error>> {
-        //let mut swarm = libp2p::SwarmBuilder::with_existing_identity(id_keys)
-        let mut swarm = libp2p::SwarmBuilder::with_new_identity()
-            .with_tokio()
-            .with_tcp(
-                tcp::Config::default(),
-                noise::Config::new,
-                yamux::Config::default,
-            )?
-            .with_behaviour(|key| {
-                //let config = kad::Config::default()
-                Ok(Behaviour {
-                    kademlia: kad::Behaviour::new(
-                        key.public().to_peer_id(),
-                        MemoryStore::new(key.public().to_peer_id()),
-                    ),
-                    mdns: mdns::tokio::Behaviour::new(
-                        mdns::Config::default(),
-                        key.public().to_peer_id(),
-                    )?,
-                })
-            })?
-            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
-            .build();
+        // build swarm
+        let mut swarm = match listen_on {
+            Some((_, ref id_keys)) => libp2p::SwarmBuilder::with_existing_identity(id_keys.clone()),
+            None => libp2p::SwarmBuilder::with_new_identity(),
+        }
+        .with_tokio()
+        .with_tcp(
+            tcp::Config::default(),
+            noise::Config::new,
+            yamux::Config::default,
+        )?
+        .with_behaviour(|key| {
+            //let config = kad::Config::default()
+            Ok(Behaviour {
+                kademlia: kad::Behaviour::new(
+                    key.public().to_peer_id(),
+                    MemoryStore::new(key.public().to_peer_id()),
+                ),
+                mdns: mdns::tokio::Behaviour::new(
+                    mdns::Config::default(),
+                    key.public().to_peer_id(),
+                )?,
+            })
+        })?
+        .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+        .build();
 
-        // change to client for client node (less intensive)
-        swarm
-            .behaviour_mut()
-            .kademlia
-            .set_mode(Some(kad::Mode::Server));
+        // listen on address if provided
+        if let Some((listen_address, _)) = listen_on {
+            swarm.listen_on(listen_address)?;
+            swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Server));
+        } else {
+            // unnecessary
+            swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Client));
+        }
 
+        let (tx_kad, handle) = Self::try_bootstrap(swarm, bootstrap_peers).await?;
+
+        Ok((Self { tx_kad }, handle))
+    }
+
+    // Add bootstrap node addresses to swarm and try to dial them
+    //
+    // Return Ok if at least one bootstrap node was successfully dialed,
+    //        Err if all nodes failed or timed out (1s)
+    async fn try_bootstrap(
+        mut swarm: Swarm<Behaviour>,
+        bootstrap_peers: &[Multiaddr],
+    ) -> Result<(mpsc::Sender<Command>, JoinHandle<()>), Box<dyn Error>> {
+        // communication with swarm gets handled through these channels
         let (tx_kad, rx_kad) = mpsc::channel(256);
 
         let num_bootstrap = bootstrap_peers.len();
-        let (tx_dial, mut rx_dial) = mpsc::channel(num_bootstrap);
+        let (tx_dial, mut rx_dial) = mpsc::channel(num_bootstrap + 1); // > 0
 
         for peer_addr in bootstrap_peers {
             let Some(Protocol::P2p(peer_id)) = peer_addr.iter().last() else {
@@ -275,7 +300,21 @@ impl DhtClient {
                 .behaviour_mut()
                 .kademlia
                 .add_address(&peer_id, peer_addr.clone());
+        }
 
+        // start kad task
+        let handle = tokio::spawn(kad_node(swarm, rx_kad));
+        
+        // don't need to bootstrap
+        if num_bootstrap == 0 {
+            println!("Starting new Kademlia network");
+            return Ok((tx_kad, handle));
+        }
+
+        for peer_addr in bootstrap_peers {
+            let Some(Protocol::P2p(peer_id)) = peer_addr.iter().last() else {
+                unreachable!()
+            };
             // try dialing all peers in bootstrap
             let _ = tx_kad
                 .send(Command::Dial {
@@ -285,8 +324,6 @@ impl DhtClient {
                 })
                 .await;
         }
-
-        let handle = tokio::spawn(kad_node(swarm, rx_kad));
 
         // wait for dial results
         let time_limit = sleep(Duration::from_secs(1));
@@ -307,14 +344,12 @@ impl DhtClient {
                 }
             }
         }
+
         if !connected_to_some {
-            return Err("Dialing bootstrap peers failed".into());
+            Err("Dialing bootstrap peers failed".into())
+        } else {
+            Ok((tx_kad, handle))
         }
-
-        // automatically called now
-        // swarm.behaviour_mut().kademlia.bootstrap()?;
-
-        Ok((Self { tx_kad }, handle))
     }
 
     pub async fn get_requests(&self, file_hash: &str) -> Result<Option<Vec<FileRequest>>, Status> {
