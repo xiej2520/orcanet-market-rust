@@ -127,18 +127,19 @@ impl Market for MarketState {
 // instance of market server with data
 pub struct Server {
     market_data: MarketData,
+    port: u16,
     //task_notify: Arc<Notify>,
 }
 
 impl Server {
-    pub fn new(dht_client: DhtClient) -> Self {
+    pub fn new(dht_client: DhtClient, port: u16) -> Self {
         let market_data = MarketData::new(dht_client);
-
-        Self { market_data }
+        Self { market_data, port }
     }
 
     pub async fn server(&mut self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let addr = "127.0.0.1:50051".parse()?;
+        let ip = "127.0.0.1";
+        let addr = format!("{}:{}", ip, self.port).parse()?;
 
         let market_state = MarketState {
             market_data: self.market_data.clone(),
