@@ -7,15 +7,15 @@ An implementation of the OrcaNet market server, built using Rust and
 
 ## Requirements
 
+The `setup.sh` script provided should install dependencies and build the project
+(tested on Ubuntu 20.04). Otherwise,
+
 1. Install [Rust](https://www.rust-lang.org/tools/install)
 2. Install protoc:
 
    `apt install protobuf-compiler`
 
    (May require more a [more recent version](https://grpc.io/docs/protoc-installation/#install-pre-compiled-binaries-any-os))
-
-The `setup.sh` script provided should install dependencies and build the project
-(tested on Ubuntu 20.04).
 
 ## Running
 
@@ -29,16 +29,16 @@ with the Kademlia network.
 The market server and the `dht_client` binary share the same parameters, which
 are used to configure the Kademlia node running on the application.
 
-* `bootstrap-peers` (Optional)
+* `bootstrap-peers`
   * Space separated list of Multiaddr peer nodes to connect to in order to
   bootstrap the node onto a Kademlia network.
-  * If this is not provided, the application will start a new Kademlia network
+  * *If this is not provided, the application will start a new Kademlia network*
 * `private-key`
   * Private key in order for the node to be set up as a Kademlia server node.
   * The application will print out the peer id derived from this key.
-  * This must be provided in order for the node to act as a server node, otherwise
-  it will only act as a client node (it can only query the network, and not
-  provide data).
+  * This must be provided in order for the node to **act as a server node**,
+  otherwise it will only act as a client node (it can only query the network,
+  and not provide data).
 * `listen-address`
   * Multiaddr that the application will listen on to act as a Kademlia server node.
   * By default, *if `private-key` is provided*, the node will listen on
@@ -52,7 +52,7 @@ with a space separated list of Multiaddrs. `private-key` and `listen-address`
 can optionally be provided to have the node also serve data to the network.
 
 ```Shell
-cargo run -- --bootstrap-peers /ip4/{ip_addr}/tcp/{port}/p2p/{public key} ...
+cargo run -- --bootstrap-peers /ip4/{ip_addr}/tcp/{port}/p2p/{peer id} ...
 ```
 
 ### Start a new Kademlia network

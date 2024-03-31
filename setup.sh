@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo apt curl unzip
+sudo apt install curl unzip
 
 # Install rust
 sudo apt install build-essential libssl-dev pkg-config
