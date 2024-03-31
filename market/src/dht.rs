@@ -1,13 +1,14 @@
 use crate::*;
 
-use std::collections::{hash_map, HashMap};
+use std::borrow::Cow;
+use std::collections::{hash_map, HashMap, HashSet};
 use std::error::Error;
 use std::time::Duration;
 
 use libp2p::futures::StreamExt;
 use libp2p::identity::Keypair;
 use libp2p::kad::store::{MemoryStore, RecordStore};
-use libp2p::kad::{self, GetRecordError};
+use libp2p::kad::{self, GetRecordError, Record};
 use libp2p::multiaddr::Protocol;
 use libp2p::{
     mdns, noise,
@@ -26,6 +27,70 @@ use tonic::Status;
 struct Behaviour {
     kademlia: kad::Behaviour<MemoryStore>,
     mdns: mdns::tokio::Behaviour,
+}
+
+// verifies that the request is ok
+fn valid_request(cur: Option<Cow<'_, Record>>, record: &Record) -> bool {
+    let key_str = std::str::from_utf8(record.key.as_ref()).unwrap();
+
+    /*
+    // check that the key is a valid sha256 hash (right now, leave it out to make testing with the test_client easier)
+    if key_str.len() != 64 {
+        return false;
+    }
+    */
+
+    let cur_values = match cur {
+        Some(cur) => serde_json::from_str(&std::str::from_utf8(&cur.value).unwrap()).unwrap(),
+        None => vec![] as Vec<FileRequest>,
+    };
+
+    let new_values: Vec<FileRequest> = serde_json::from_str(&std::str::from_utf8(&record.value).unwrap()).unwrap();
+
+    let existing_ids: HashMap<String, FileRequest> = 
+        cur_values
+        .iter()
+        .map(|x| (x.user.id.clone(), x.clone()))
+        .collect();
+
+    let mut seen_ids: HashSet<String> = HashSet::new();
+    let now = get_current_time();
+
+    for new in new_values {
+        // check that the expiration date is valid and the file hash matches the key
+        if new.expiration < now || new.expiration > now + EXPIRATION_OFFSET || key_str != new.file_hash {
+            return false;
+        }
+        
+        
+        if existing_ids.contains_key(&new.user.id) {
+            let existing = existing_ids.get(&new.user.id).unwrap();
+
+            // check that there isn't duplicate ids
+            // check that the new expiration date is not before the old one
+            // a newer one is ok, within the offset already checked above
+            if seen_ids.contains(&new.user.id) || existing.expiration < new.expiration {
+                return false;
+            }
+
+            seen_ids.insert(new.user.id.clone());
+        }
+    }
+
+    // look for any ids that were missing from the new request
+    for id in existing_ids.keys() {
+        if !seen_ids.contains(id) {
+            let existing = existing_ids.get(id).unwrap();
+
+            // if this has not expired yet, but it is missing from the new request thats an error
+            if existing.expiration < now {
+                return false;
+            } 
+        }
+    }    
+    
+
+    true
 }
 
 /// Think about concurrency issues with multiple users accessing and modifying
@@ -97,17 +162,21 @@ async fn kad_node(mut swarm: Swarm<Behaviour>, mut rx_kad: mpsc::Receiver<Comman
                             let key_str = std::str::from_utf8(record.key.as_ref()).unwrap();
                             let value_str = std::str::from_utf8(&record.value).unwrap();
                            
-                           println!(
+                            println!(
                                 "Received record {:?} {:?}",
                                 key_str,
                                 value_str,
                             );
 
-                            let res = swarm.behaviour_mut().kademlia.store_mut().put(record);
+                            let cur = swarm.behaviour_mut().kademlia.store_mut().get(&record.key);
 
-                            println!("{res:?}");
+                            if valid_request(cur, &record) {
+                                let res = swarm.behaviour_mut().kademlia.store_mut().put(record);
+                                println!("{res:?}");
+                            } else {
+                                println!("Malicious request");
+                            }
                         }
-                        
                     }
                     _ => {}
                 }
