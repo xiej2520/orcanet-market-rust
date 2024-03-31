@@ -57,6 +57,7 @@ async fn kad_node(mut swarm: Swarm<Behaviour>, mut rx_kad: mpsc::Receiver<Comman
                     publisher: None,
                     expires: None,
                 };
+
                 swarm.behaviour_mut().kademlia.put_record(record, kad::Quorum::One)
                     .expect("Failed to store record locally.");
             },
@@ -89,6 +90,34 @@ async fn kad_node(mut swarm: Swarm<Behaviour>, mut rx_kad: mpsc::Receiver<Comman
                     swarm.behaviour_mut().kademlia.add_address(&peer_id, multiaddr);
                 }
             }
+            SwarmEvent::Behaviour(BehaviourEvent::Kademlia(kad::Event::InboundRequest { request })) => {
+                match request {
+                    kad::InboundRequest::PutRecord { record, .. } => {
+                        if let Some(record) = record {
+                            let key_str = std::str::from_utf8(record.key.as_ref()).unwrap();
+                            let value_str = std::str::from_utf8(&record.value).unwrap();
+                           
+                           println!(
+                                "Received record {:?} {:?}",
+                                key_str,
+                                value_str,
+                            );
+
+                            let record = kad::Record {
+                                key: record.key,
+                                value: record.value,
+                                publisher: None,
+                                expires: None,
+                            };
+
+                            swarm.behaviour_mut().kademlia.put_record(record, kad::Quorum::One)
+                                .expect("Failed to store record locally.");
+                        }
+                        
+                    }
+                    _ => {}
+                }
+            },
             SwarmEvent::Behaviour(BehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { result, .. })) => {
                 match result {
                     kad::QueryResult::GetProviders(Ok(kad::GetProvidersOk::FoundProviders { key, providers, .. })) => {
@@ -248,11 +277,14 @@ impl DhtClient {
             yamux::Config::default,
         )?
         .with_behaviour(|key| {
-            //let config = kad::Config::default()
+            let mut config = kad::Config::default();
+            config.set_record_filtering(kad::StoreInserts::FilterBoth);
+
             Ok(Behaviour {
-                kademlia: kad::Behaviour::new(
+                kademlia: kad::Behaviour::with_config(
                     key.public().to_peer_id(),
                     MemoryStore::new(key.public().to_peer_id()),
+                    config
                 ),
                 mdns: mdns::tokio::Behaviour::new(
                     mdns::Config::default(),
