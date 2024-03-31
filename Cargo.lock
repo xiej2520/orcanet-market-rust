@@ -2005,6 +2005,7 @@ dependencies = [
  "lib-proto",
  "libp2p",
  "prost",
+ "rand",
  "serde",
  "serde_json",
  "tokio",

@@ -1,4 +1,4 @@
-use lib_proto::market::*;
+use lib_proto::{market::*, MarketClient};
 use tonic::Request;
 
 #[tokio::test]
