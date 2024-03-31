@@ -2,10 +2,23 @@ use std::io::{stdin, stdout, Write};
 
 use lib_proto::*;
 
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    // port to connect to
+    #[arg(short, long, default_value = "50051")]
+    port: u16,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scan = stdin();
-    let mut client = MarketClient::connect("http://127.0.0.1:50051")
+
+    let args = Args::parse();
+
+    let mut client = MarketClient::connect(format!("http://127.0.0.1:{}", args.port))
         .await
         .unwrap();
 

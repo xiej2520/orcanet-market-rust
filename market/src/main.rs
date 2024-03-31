@@ -21,6 +21,10 @@ struct Args {
     /// Multiaddr for listen address
     #[arg(short, long, default_value = "/ip4/0.0.0.0/tcp/6881")]
     listen_address: Option<Multiaddr>,
+
+    // port the market server listens on
+    #[arg(long, default_value = "50051")]
+    port: u16,
 }
 
 #[tokio::main]
@@ -28,6 +32,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
     let bootstrap_peers = args.bootstrap_peers;
+
+    if args.port < 1024 {        
+        Err("Invalid port")?;
+    }
 
     let id_keys = if let Some(private_key) = args.private_key {
         let mut bytes = std::fs::read(private_key).expect("Failed to read private key bytes");
@@ -47,7 +55,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let server_handle = tokio::spawn(async move {
-        let mut m = Server::new(dht_client);
+        let mut m = Server::new(dht_client, args.port);
         m.server().await
     });
 

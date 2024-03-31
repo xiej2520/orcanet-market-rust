@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use libp2p::futures::StreamExt;
 use libp2p::identity::Keypair;
-use libp2p::kad::store::MemoryStore;
+use libp2p::kad::store::{MemoryStore, RecordStore};
 use libp2p::kad::{self, GetRecordError};
 use libp2p::multiaddr::Protocol;
 use libp2p::{
@@ -103,15 +103,9 @@ async fn kad_node(mut swarm: Swarm<Behaviour>, mut rx_kad: mpsc::Receiver<Comman
                                 value_str,
                             );
 
-                            let record = kad::Record {
-                                key: record.key,
-                                value: record.value,
-                                publisher: None,
-                                expires: None,
-                            };
+                            let res = swarm.behaviour_mut().kademlia.store_mut().put(record);
 
-                            swarm.behaviour_mut().kademlia.put_record(record, kad::Quorum::One)
-                                .expect("Failed to store record locally.");
+                            println!("{res:?}");
                         }
                         
                     }
