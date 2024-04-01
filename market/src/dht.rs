@@ -95,7 +95,7 @@ fn valid_request(cur: Option<Cow<'_, Record>>, record: &Record) -> bool {
             let existing = existing_ids.get(id).unwrap();
 
             // if this has not expired yet, but it is missing from the new request thats an error
-            if existing.expiration < now {
+            if now < existing.expiration {
                 println!("Missing unexpired value");
                 return false;
             } 
