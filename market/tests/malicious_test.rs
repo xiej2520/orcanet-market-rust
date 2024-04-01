@@ -46,10 +46,11 @@ async fn test_malicious_delete() {
         port: 1,
         price: 1
     };
+    let valid_exp = get_current_time() + 1000;
     let fr1 = FileRequest {
         user: user1.clone(),
         file_hash: file_hash.clone(),
-        expiration: get_current_time() + 100
+        expiration: valid_exp
     };
 
     let requests = vec![fr1];
@@ -64,11 +65,16 @@ async fn test_malicious_delete() {
 
     let requests = vec![fr2];
     let _res = dht_client.set_requests(&file_hash, requests).await;
+    
+    // use a new client to avoid the local map
+    drop(dht_client);
+    let dht_client2 = create_test_client().await;
 
-    let end_holders = dht_client.get_requests(&file_hash).await.unwrap();
+    let end_holders = dht_client2.get_requests(&file_hash).await.unwrap();
     match end_holders {
         Some(holders) => {
             assert_eq!(holders.len(), 1);
+            assert_eq!(holders[0].expiration, valid_exp);
         },
         None => {
             panic!("Failed to get holders");

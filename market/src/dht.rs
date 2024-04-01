@@ -57,8 +57,14 @@ fn valid_request(cur: Option<Cow<'_, Record>>, record: &Record) -> bool {
     let now = get_current_time();
 
     for new in new_values {
-        // check that the expiration date is valid and the file hash matches the key
-        if new.expiration < now || new.expiration > now + EXPIRATION_OFFSET || key_str != new.file_hash {
+        // check that the expiration date is valid
+        if new.expiration < now || new.expiration > now + EXPIRATION_OFFSET {
+            println!("Invalid expiration");
+            return false;
+        }
+
+        if key_str != new.file_hash {
+            println!("File hash does not match key");
             return false;
         }
         
@@ -67,9 +73,15 @@ fn valid_request(cur: Option<Cow<'_, Record>>, record: &Record) -> bool {
             let existing = existing_ids.get(&new.user.id).unwrap();
 
             // check that there isn't duplicate ids
+            if seen_ids.contains(&new.user.id) {
+                println!("Duplicate id");
+                return false;
+            }
+
             // check that the new expiration date is not before the old one
             // a newer one is ok, within the offset already checked above
-            if seen_ids.contains(&new.user.id) || existing.expiration < new.expiration {
+            if new.expiration < existing.expiration {
+                println!("New expiration is before the current one");
                 return false;
             }
 
@@ -84,6 +96,7 @@ fn valid_request(cur: Option<Cow<'_, Record>>, record: &Record) -> bool {
 
             // if this has not expired yet, but it is missing from the new request thats an error
             if existing.expiration < now {
+                println!("Missing unexpired value");
                 return false;
             } 
         }
