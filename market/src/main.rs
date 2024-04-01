@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let bootstrap_peers = args.bootstrap_peers;
 
-    if args.port < 1024 {        
+    if args.port < 1024 {
         Err("Invalid port")?;
     }
 

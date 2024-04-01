@@ -45,10 +45,10 @@ fn valid_request(cur: Option<Cow<'_, Record>>, record: &Record) -> bool {
         None => vec![] as Vec<FileRequest>,
     };
 
-    let new_values: Vec<FileRequest> = serde_json::from_str(&std::str::from_utf8(&record.value).unwrap()).unwrap();
+    let new_values: Vec<FileRequest> =
+        serde_json::from_str(&std::str::from_utf8(&record.value).unwrap()).unwrap();
 
-    let existing_ids: HashMap<String, FileRequest> = 
-        cur_values
+    let existing_ids: HashMap<String, FileRequest> = cur_values
         .iter()
         .map(|x| (x.user.id.clone(), x.clone()))
         .collect();
@@ -67,8 +67,7 @@ fn valid_request(cur: Option<Cow<'_, Record>>, record: &Record) -> bool {
             println!("File hash does not match key");
             return false;
         }
-        
-        
+
         if existing_ids.contains_key(&new.user.id) {
             let existing = existing_ids.get(&new.user.id).unwrap();
 
@@ -98,10 +97,9 @@ fn valid_request(cur: Option<Cow<'_, Record>>, record: &Record) -> bool {
             if now < existing.expiration {
                 println!("Missing unexpired value");
                 return false;
-            } 
+            }
         }
-    }    
-    
+    }
 
     true
 }
@@ -174,7 +172,7 @@ async fn kad_node(mut swarm: Swarm<Behaviour>, mut rx_kad: mpsc::Receiver<Comman
                         if let Some(record) = record {
                             let key_str = std::str::from_utf8(record.key.as_ref()).unwrap();
                             let value_str = std::str::from_utf8(&record.value).unwrap();
-                           
+
                             println!(
                                 "Received record {:?} {:?}",
                                 key_str,
@@ -360,7 +358,7 @@ impl DhtClient {
                 kademlia: kad::Behaviour::with_config(
                     key.public().to_peer_id(),
                     MemoryStore::new(key.public().to_peer_id()),
-                    config
+                    config,
                 ),
                 mdns: mdns::tokio::Behaviour::new(
                     mdns::Config::default(),
@@ -374,10 +372,16 @@ impl DhtClient {
         // listen on address if provided
         if let Some((listen_address, _)) = listen_on {
             swarm.listen_on(listen_address)?;
-            swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Server));
+            swarm
+                .behaviour_mut()
+                .kademlia
+                .set_mode(Some(kad::Mode::Server));
         } else {
             // unnecessary
-            swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Client));
+            swarm
+                .behaviour_mut()
+                .kademlia
+                .set_mode(Some(kad::Mode::Client));
         }
 
         let (tx_kad, handle) = Self::try_bootstrap(swarm, bootstrap_peers).await?;
@@ -412,7 +416,7 @@ impl DhtClient {
 
         // start kad task
         let handle = tokio::spawn(kad_node(swarm, rx_kad));
-        
+
         // don't need to bootstrap
         if num_bootstrap == 0 {
             println!("Starting new Kademlia network");
