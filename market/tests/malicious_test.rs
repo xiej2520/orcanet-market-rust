@@ -14,7 +14,7 @@ fn random_string(len: usize) -> String {
 }
 
 async fn create_test_client() -> dht::DhtClient {
-    let str = "/ip4/130.245.173.204/tcp/6882/p2p/QmXQ2cfTwrNVAqepupQQYdsyrHsscR2TWkghWxYUjNLmKU"
+    let str = "/ip4/130.245.173.204/tcp/6885/p2p/QmXQ2cfTwrNVAqepupQQYdsyrHsscR2TWkghWxYUjNLmKU"
         .to_string();
     let bootstrap_peers = vec![str.parse().unwrap()];
 
@@ -158,6 +158,47 @@ async fn test_malicious_spam() {
         Some(holders) => {
             assert_eq!(holders.len(), 1);
             assert_eq!(holders[0].expiration, valid_exp);
+        }
+        None => {
+            panic!("Failed to get holders");
+        }
+    }
+}
+
+
+#[tokio::test]
+async fn test_mismatched_id() {
+    let dht_client = create_test_client().await;
+
+    //valid request
+    let file_hash = random_string(32);
+    let file_hash_fake = random_string(32);
+    let user1 = User {
+        id: random_string(10),
+        name: random_string(10),
+        ip: random_string(10),
+        port: 1,
+        price: 1,
+    };
+    let valid_exp = get_current_time() + 1000;
+    let fr1 = FileRequest {
+        user: user1.clone(),
+        file_hash: file_hash.clone(),
+        expiration: valid_exp,
+    };
+
+    //try to put with a key that doesn't match the file hash
+    let requests = vec![fr1.clone()];
+    let _res = dht_client.set_requests(&file_hash_fake, requests).await;
+
+    // use a new client to avoid the local map
+    drop(dht_client);
+    let dht_client2 = create_test_client().await;
+
+    let end_holders = dht_client2.get_requests(&file_hash).await.unwrap();
+    match end_holders {
+        Some(holders) => {
+            assert_eq!(holders.len(), 0);
         }
         None => {
             panic!("Failed to get holders");
